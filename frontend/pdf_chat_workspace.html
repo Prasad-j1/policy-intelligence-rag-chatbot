@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Chat — AstraNova Technologies</title>
+<link rel="stylesheet" href="/frontend/shared/theme.css">
+<script>
+  (function() {
+    var t = localStorage.getItem('pia-theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+<script src="/frontend/shared/api.js" defer></script>
+<script src="/frontend/shared/ui.js" defer></script>
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  .app-shell { display: flex; height: 100vh; }
+
+  .sidebar {
+    width: 288px; flex-shrink: 0;
+    display: flex; flex-direction: column;
+    background: var(--color-bg-elevated);
+    border-right: 1px solid var(--color-border);
+    transition: width var(--duration-slow) var(--ease-emphasized);
+    overflow: hidden;
+  }
+  .sidebar.collapsed { width: 76px; }
+  .sidebar-top { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); flex-shrink: 0; }
+  .sidebar-brand { display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-1) var(--space-2); }
+  .sidebar-brand-mark {
+    width: 32px; height: 32px; border-radius: var(--radius-sm); flex-shrink: 0;
+    background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sidebar-brand-mark svg { width: 16px; height: 16px; color: #fff; }
+  .sidebar-brand-text { font-family: var(--font-display); font-weight: var(--weight-semibold); font-size: var(--text-sm); white-space: nowrap; }
+  .sidebar.collapsed .sidebar-brand-text,
+  .sidebar.collapsed .label,
+  .sidebar.collapsed .search-box,
+  .sidebar.collapsed .segmented,
+  .sidebar.collapsed .conversation-list,
+  .sidebar.collapsed .footer-labels { display: none; }
+  .sidebar.collapsed .sidebar-top,
+  .sidebar.collapsed .sidebar-bottom { align-items: center; }
+  .sidebar.collapsed .new-chat-btn { justify-content: center; padding: var(--space-3); }
+  .sidebar.collapsed .icon-btn.collapse-toggle svg { transform: rotate(180deg); }
+
+  .new-chat-btn {
+    width: 100%; background: var(--color-surface); border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);
+    display: flex; align-items: center; gap: var(--space-3); font-size: var(--text-sm); font-weight: var(--weight-medium);
+    color: var(--color-text-primary); transition: background var(--duration-fast), transform var(--duration-fast);
+  }
+  .new-chat-btn:hover { background: var(--color-surface-hover); transform: translateY(-1px); }
+  .new-chat-btn svg { width: 16px; height: 16px; color: var(--color-accent); flex-shrink: 0; }
+
+  .search-box { position: relative; }
+  .search-box svg { position: absolute; left: var(--space-3); top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--color-text-tertiary); pointer-events: none; }
+  .search-box input { padding-left: var(--space-7); }
+  .search-box .clear-search { position: absolute; right: var(--space-2); top: 50%; transform: translateY(-50%); width: 22px; height: 22px; display: none; align-items: center; justify-content: center; color: var(--color-text-tertiary); border-radius: 50%; }
+  .search-box .clear-search:hover { background: var(--color-surface-hover); }
+  .search-box.has-value .clear-search { display: flex; }
+  .search-box .clear-search svg { position: static; width: 12px; height: 12px; }
+
+  .conversation-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--space-3) var(--space-3); }
+  .group-label { font-family: var(--font-mono); font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-tertiary); padding: var(--space-4) var(--space-3) var(--space-2); }
+  .conv-item {
+    position: relative; display: flex; align-items: center; gap: var(--space-2);
+    padding: var(--space-3); border-radius: var(--radius-md); cursor: pointer;
+    transition: background var(--duration-fast);
+  }
+  .conv-item:hover { background: var(--color-surface-hover); }
+  .conv-item.active { background: var(--color-surface-active); }
+  .conv-item-main { flex: 1; min-width: 0; }
+  .conv-item-title { font-size: var(--text-sm); color: var(--color-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conv-item-title mark { background: color-mix(in srgb, var(--color-accent) 35%, transparent); color: inherit; border-radius: 2px; }
+  .conv-item-menu-btn { opacity: 0; flex-shrink: 0; }
+  .conv-item:hover .conv-item-menu-btn, .conv-item-menu-btn.open { opacity: 1; }
+  .conv-rename-input { width: 100%; background: var(--color-bg-sunken); border: 1px solid var(--color-border-focus); border-radius: var(--radius-sm); font-size: var(--text-sm); color: var(--color-text-primary); padding: var(--space-1) var(--space-2); }
+  .empty-list-note { padding: var(--space-6) var(--space-3); text-align: center; color: var(--color-text-tertiary); font-size: var(--text-sm); }
+
+  .sidebar-bottom { flex-shrink: 0; padding: var(--space-4); border-top: 1px solid var(--color-border); display: flex; flex-direction: column; gap: var(--space-4); }
+  .sidebar-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+  .sidebar-row .label { font-size: var(--text-sm); color: var(--color-text-secondary); display: flex; align-items: center; gap: var(--space-3); }
+  .sidebar-row .label svg { width: 16px; height: 16px; color: var(--color-text-tertiary); flex-shrink: 0; }
+
+  .mobile-sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: var(--z-overlay); opacity: 0; transition: opacity var(--duration-base); }
+  .mobile-sidebar-overlay.open { display: block; opacity: 1; }
+
+  .chat-main { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100vh; }
+
+  .chat-header {
+    flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+    padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg);
+  }
+  .chat-header-left { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+  .mobile-menu-btn { display: none; }
+  .chat-header-title { font-family: var(--font-display); font-weight: var(--weight-semibold); font-size: var(--text-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-header-actions { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
+
+  .doc-pill {
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-full);
+    background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-accent) 28%, transparent);
+    font-size: var(--text-xs); color: var(--color-accent-soft);
+    max-width: 260px; flex-shrink: 1; min-width: 0;
+  }
+  .doc-pill svg { width: 13px; height: 13px; flex-shrink: 0; }
+  .doc-pill span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .messages-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6); }
+  .messages-inner { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-6); padding-bottom: var(--space-4); }
+
+  .upload-wrap { max-width: 560px; margin: var(--space-8) auto; }
+  .upload-zone {
+    border: 2px dashed var(--color-border-strong);
+    border-radius: var(--radius-xl);
+    padding: var(--space-8) var(--space-6);
+    text-align: center;
+    transition: border-color var(--duration-base) var(--ease-standard), background var(--duration-base) var(--ease-standard);
+    cursor: pointer;
+  }
+  .upload-zone:hover, .upload-zone.dragging {
+    border-color: var(--color-accent);
+    background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+  }
+  .upload-zone-icon {
+    width: 60px; height: 60px; margin: 0 auto var(--space-5);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: var(--shadow-glow-accent);
+  }
+  .upload-zone-icon svg { width: 28px; height: 28px; color: #fff; }
+  .upload-zone h2 { font-size: var(--text-lg); margin-bottom: var(--space-2); }
+  .upload-zone p { color: var(--color-text-secondary); font-size: var(--text-sm); margin-bottom: var(--space-5); }
+  .upload-zone .constraints { margin-top: var(--space-4); font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary); }
+  .upload-error-note { display: flex; align-items: center; justify-content: center; gap: var(--space-2); margin-top: var(--space-4); font-size: var(--text-sm); color: var(--color-danger); }
+  .upload-error-note svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+  .processing-wrap { max-width: 480px; margin: var(--space-8) auto; text-align: center; }
+  .processing-wrap h2 { font-size: var(--text-lg); margin-bottom: var(--space-6); }
+  .stepper { display: flex; flex-direction: column; gap: var(--space-3); text-align: left; }
+  .step-item {
+    display: flex; align-items: center; gap: var(--space-3);
+    padding: var(--space-4); border-radius: var(--radius-md);
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    transition: border-color var(--duration-base), background var(--duration-base);
+  }
+  .step-icon {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--color-bg-sunken); color: var(--color-text-tertiary);
+    transition: background var(--duration-base), color var(--duration-base);
+  }
+  .step-icon svg { width: 14px; height: 14px; }
+  .step-label { font-size: var(--text-sm); color: var(--color-text-tertiary); transition: color var(--duration-base); }
+
+  .step-item.active { border-color: var(--color-border-focus); background: color-mix(in srgb, var(--color-primary) 6%, transparent); }
+  .step-item.active .step-icon { background: color-mix(in srgb, var(--color-primary) 18%, transparent); color: var(--color-primary-soft); }
+  .step-item.active .step-label { color: var(--color-text-primary); }
+  .step-item.active .step-icon svg { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .step-item.done .step-icon { background: color-mix(in srgb, var(--color-accent) 20%, transparent); color: var(--color-accent); }
+  .step-item.done .step-label { color: var(--color-text-secondary); }
+
+  .step-item.failed .step-icon { background: color-mix(in srgb, var(--color-danger) 20%, transparent); color: var(--color-danger); }
+  .step-item.failed .step-label { color: var(--color-danger); }
+
+  .doc-ready-card {
+    max-width: 480px; margin: var(--space-6) auto var(--space-7);
+    padding: var(--space-5); border-radius: var(--radius-lg);
+    display: flex; align-items: center; gap: var(--space-4);
+  }
+  .doc-ready-icon {
+    width: 44px; height: 44px; border-radius: var(--radius-md); flex-shrink: 0;
+    background: color-mix(in srgb, var(--color-accent) 16%, transparent); color: var(--color-accent);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .doc-ready-icon svg { width: 21px; height: 21px; }
+  .doc-ready-info { min-width: 0; flex: 1; }
+  .doc-ready-name { font-size: var(--text-sm); font-weight: var(--weight-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .doc-ready-meta { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary); margin-top: 2px; }
+
+  .empty-state { max-width: 640px; margin: 0 auto var(--space-8); text-align: center; }
+  .empty-state h2 { font-size: var(--text-xl); margin-bottom: var(--space-3); }
+  .empty-state p { color: var(--color-text-secondary); margin-bottom: var(--space-6); }
+  .suggested-chips { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: center; }
+  .chip-btn {
+    font-size: var(--text-sm); padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-full); border: 1px solid var(--color-border-strong); background: var(--color-surface);
+    color: var(--color-text-secondary); transition: background var(--duration-fast), transform var(--duration-fast), color var(--duration-fast);
+  }
+  .chip-btn:hover { background: var(--color-surface-hover); color: var(--color-text-primary); transform: translateY(-2px); }
+
+  .message { display: flex; gap: var(--space-3); align-items: flex-start; }
+  .message.user { flex-direction: row-reverse; }
+  .msg-avatar { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .message.user .msg-avatar { background: var(--color-surface-active); color: var(--color-text-secondary); }
+  .message.assistant .msg-avatar { background: linear-gradient(135deg, var(--color-accent), var(--color-primary)); color: #fff; }
+  .msg-avatar svg { width: 15px; height: 15px; }
+
+  .msg-bubble-wrap { max-width: min(680px, 82%); min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+  .message.user .msg-bubble-wrap { align-items: flex-end; }
+
+  .msg-bubble { padding: var(--space-4) var(--space-5); border-radius: var(--radius-lg); word-wrap: break-word; overflow-wrap: anywhere; font-size: var(--text-base); line-height: var(--leading-relaxed); }
+  .message.user .msg-bubble { background: linear-gradient(135deg, var(--color-accent), var(--color-accent-strong)); color: #06110D; border-bottom-right-radius: var(--radius-sm); }
+  .message.assistant .msg-bubble { background: var(--color-surface); border: 1px solid var(--color-border); border-bottom-left-radius: var(--radius-sm); }
+  .message.assistant .msg-bubble.confidence-high, .message.assistant .msg-bubble.confidence-mid, .message.assistant .msg-bubble.confidence-low { padding-left: calc(var(--space-5) - 2px); }
+  .message.assistant .msg-bubble.no-evidence { border-style: dashed; }
+
+  .no-evidence-tag { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--color-text-tertiary); margin-top: var(--space-3); }
+  .no-evidence-tag svg { width: 14px; height: 14px; }
+
+  .msg-actions { display: flex; align-items: center; gap: var(--space-1); }
+  .msg-action-btn { padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); color: var(--color-text-tertiary); display: flex; align-items: center; gap: var(--space-1); font-size: var(--text-xs); }
+  .msg-action-btn:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
+  .msg-action-btn svg { width: 14px; height: 14px; }
+  .msg-action-btn.liked { color: var(--color-accent); }
+  .msg-action-btn.disliked { color: var(--color-danger); }
+
+  .evidence-toggle { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--color-text-secondary); margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-border); width: 100%; }
+  .evidence-toggle svg.chevron { width: 12px; height: 12px; transition: transform var(--duration-fast); margin-left: auto; }
+  .evidence-toggle.open svg.chevron { transform: rotate(180deg); }
+  .evidence-panel { display: none; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
+  .evidence-panel.open { display: flex; }
+  .evidence-card { padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-bg-elevated); border: 1px solid var(--color-border); }
+  .evidence-card-top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-1); }
+  .evidence-card-source { font-size: var(--text-sm); font-weight: var(--weight-medium); }
+  .evidence-card-meta { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--color-text-tertiary); }
+
+  .devmode-panel { margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-bg-sunken); border: 1px solid var(--color-border); font-family: var(--font-mono); font-size: 0.75rem; }
+  .devmode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2) var(--space-4); }
+  .devmode-key { color: var(--color-text-tertiary); }
+  .devmode-val { color: var(--color-text-secondary); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* .followup-row { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-1); }
+  .followup-chip { font-size: var(--text-xs); padding: var(--space-2) var(--space-3); border-radius: var(--radius-full); border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text-secondary); transition: background var(--duration-fast), color var(--duration-fast); }
+  .followup-chip:hover { background: var(--color-surface-hover); color: var(--color-text-primary); } */
+   .followup-row {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;      /* Center horizontally */
+        align-items: center;
+        gap: 10px;
+        margin: 18px 0 22px 0;        /* Space above and below */
+        padding: 0 20px;              /* Prevent touching screen edges */
+      } 
+
+      .followup-chip {
+    padding: 10px 18px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.05);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .25s ease;
+    backdrop-filter: blur(12px);
+    max-width: 500px;
+    text-align: center;
+}
+
+.followup-chip:hover {
+    transform: translateY(-2px);
+    background: rgba(99,102,241,.18);
+    border-color: rgba(99,102,241,.45);
+    box-shadow: 0 8px 20px rgba(99,102,241,.18);
+}
+
+.followup-chip:active {
+    transform: scale(.97);
+}
+  .thinking-bubble { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-5); }
+  .thinking-dots { display: flex; gap: 4px; }
+  .thinking-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--color-text-tertiary); animation: dotPulse 1.2s infinite ease-in-out; }
+  .thinking-dots span:nth-child(2) { animation-delay: 0.15s; }
+  .thinking-dots span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes dotPulse { 0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); } 30% { opacity: 1; transform: scale(1); } }
+  .thinking-label { font-size: var(--text-xs); color: var(--color-text-tertiary); }
+
+  .msg-error-note { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--color-danger); margin-top: var(--space-2); }
+  .retry-btn { font-size: var(--text-xs); color: var(--color-primary-soft); text-decoration: underline; }
+
+  .composer-wrap { flex-shrink: 0; padding: var(--space-4) var(--space-6) var(--space-5); background: var(--color-bg); border-top: 1px solid var(--color-border); }
+  .composer-inner { max-width: 820px; margin: 0 auto; }
+  .composer-disabled-note { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--color-text-tertiary); margin-bottom: var(--space-2); padding: 0 var(--space-2); }
+  .composer-disabled-note svg { width: 13px; height: 13px; }
+  .composer { display: flex; align-items: flex-end; gap: var(--space-3); background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5); transition: border-color var(--duration-fast); }
+  .composer:focus-within { border-color: var(--color-border-focus); }
+  .composer textarea { flex: 1; resize: none; background: none; border: none; outline: none; font-family: var(--font-body); font-size: var(--text-base); color: var(--color-text-primary); max-height: 200px; line-height: var(--leading-normal); padding: var(--space-2) 0; }
+  .composer textarea::placeholder { color: var(--color-text-tertiary); }
+  .composer textarea:disabled { opacity: 0.6; }
+  .send-btn { width: 40px; height: 40px; flex-shrink: 0; border-radius: var(--radius-md); background: var(--color-accent); color: #06110D; display: flex; align-items: center; justify-content: center; transition: background var(--duration-fast), transform var(--duration-fast), opacity var(--duration-fast); }
+  .send-btn:hover:not(:disabled) { background: var(--color-accent-strong); transform: scale(1.05); }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .send-btn svg { width: 17px; height: 17px; }
+  .composer-meta { display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-2); padding: 0 var(--space-2); }
+  .char-count { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--color-text-tertiary); }
+  .composer-hint { font-size: 0.6875rem; color: var(--color-text-tertiary); }
+
+  @media (max-width: 960px) {
+    .sidebar { position: fixed; top: 0; left: 0; height: 100vh; z-index: var(--z-modal); transform: translateX(-100%); width: 288px !important; transition: transform var(--duration-slow) var(--ease-emphasized); }
+    .sidebar.mobile-open { transform: translateX(0); }
+    .sidebar.collapsed .sidebar-brand-text, .sidebar.collapsed .label, .sidebar.collapsed .search-box, .sidebar.collapsed .segmented, .sidebar.collapsed .conversation-list, .sidebar.collapsed .footer-labels { display: revert; }
+    .collapse-toggle { display: none; }
+    .mobile-menu-btn { display: flex; }
+    .msg-bubble-wrap { max-width: 90%; }
+    .messages-scroll, .composer-wrap { padding-left: var(--space-4); padding-right: var(--space-4); }
+    .chat-header { padding: var(--space-3) var(--space-4); flex-wrap: wrap; }
+    .doc-pill { max-width: 160px; }
+    .devmode-grid { grid-template-columns: 1fr; }
+  }
+  svg {
+    width: 22px;
+    height: 22px;
+    display: block;
+}
+.llm-dropdown{
+
+    position:relative;
+
+    width:calc(100% - 28px);
+
+    margin:14px auto;
+
+}
+
+.llm-dropdown-btn{
+
+    width:100%;
+
+    height:48px;
+
+    border-radius:14px;
+
+    border:1px solid rgba(99,102,241,.45);
+
+    background:#151925;
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    padding:0 16px;
+
+    cursor:pointer;
+
+    transition:.25s;
+
+}
+
+.llm-dropdown-btn:hover{
+
+    border-color:#6C8BFF;
+
+    box-shadow:0 0 18px rgba(108,139,255,.18);
+
+}
+
+.llm-left{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:10px;
+
+}
+
+.llm-star{
+
+    width:18px;
+
+    height:18px;
+
+    fill:none;
+
+    stroke:#7C9BFF;
+
+    stroke-width:2;
+
+}
+
+.llm-arrow{
+
+    width:18px;
+
+    height:18px;
+
+    fill:none;
+
+    stroke:#9CA3AF;
+
+    stroke-width:2;
+
+    transition:.25s;
+
+}
+
+.llm-menu{
+
+    position:absolute;
+
+    top:55px;
+
+    left:0;
+
+    width:100%;
+
+    background:#181D2A;
+
+    border-radius:14px;
+
+    border:1px solid rgba(255,255,255,.08);
+
+    backdrop-filter:blur(18px);
+
+    overflow:hidden;
+
+    opacity:0;
+
+    transform:translateY(-10px);
+
+    pointer-events:none;
+
+    transition:.25s;
+
+    z-index:1000;
+
+    box-shadow:0 18px 40px rgba(0,0,0,.45);
+
+}
+
+.llm-dropdown.open .llm-menu{
+
+    opacity:1;
+
+    transform:translateY(0);
+
+    pointer-events:auto;
+
+}
+
+.llm-dropdown.open .llm-arrow{
+
+    transform:rotate(180deg);
+
+}
+
+.llm-item{
+
+    padding:14px 18px;
+
+    cursor:pointer;
+
+    color:#F5F7FA;
+
+    transition:.2s;
+
+}
+
+.llm-item:hover{
+
+    background:rgba(99,102,241,.15);
+
+}
+
+.llm-item.active{
+
+    color:#7C9BFF;
+
+    font-weight:600;
+
+}
+
+
+
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <div class="mobile-sidebar-overlay" id="sidebarOverlay"></div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-top">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        </div>
+        <span class="sidebar-brand-text">PDF Chat</span>
+        <button class="icon-btn icon-btn-sm collapse-toggle" id="collapseToggle" style="margin-left:auto" aria-label="Collapse sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+      </div>
+
+      <button class="new-chat-btn" id="newChatBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        <span class="label">New Chat</span>
+      </button>
+
+      <div class="search-box" id="searchBox">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" class="text-input" id="searchInput" placeholder="Search chats...">
+        <button class="clear-search" id="clearSearch" aria-label="Clear search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="segmented">
+        <button id="switchPolicy">Policy Assistant</button>
+        <button class="active" id="switchPdf">PDF Chat</button>
+      </div>
+    </div>
+
+    <div class="llm-dropdown" id="llmDropdown">
+
+    <button
+        class="llm-dropdown-btn"
+        id="llmButton"
+        type="button">
+
+        <span class="llm-left">
+
+            <svg class="llm-star" viewBox="0 0 24 24">
+                <path d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2Z"/>
+            </svg>
+
+            <span id="selectedModel">
+                NVIDIA Nemotron
+            </span>
+
+        </span>
+
+        <svg class="llm-arrow" viewBox="0 0 24 24">
+            <path d="M7 10L12 15L17 10"/>
+        </svg>
+
+    </button>
+
+    <div class="llm-menu" id="llmMenu">
+
+        <div
+            class="llm-item active"
+            data-provider="nvidia">
+            ✓ NVIDIA Nemotron
+
+        </div>
+
+        <div
+            class="llm-item"
+            data-provider="ollama">
+
+            Ollama Local
+
+        </div>
+
+    </div>
+
+</div>
+
+    <div class="conversation-list" id="conversationList"></div>
+
+    <div class="sidebar-bottom">
+      <div class="sidebar-row">
+        <span class="label footer-labels">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          Developer Mode
+        </span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="devModeToggle">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="sidebar-row">
+        <button class="icon-btn" id="themeToggle" aria-label="Toggle theme">
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+        <a href="dashboard.html" class="icon-btn" aria-label="Back to home">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <main class="chat-main">
+    <header class="chat-header">
+      <div class="chat-header-left">
+        <button class="icon-btn mobile-menu-btn" id="mobileMenuBtn" aria-label="Open sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <span class="chat-header-title" id="chatTitle">New Chat</span>
+      </div>
+      <div class="chat-header-actions" id="headerActions"></div>
+    </header>
+
+    <div class="messages-scroll" id="messagesScroll">
+      <div class="messages-inner" id="messagesInner"></div>
+    </div>
+
+    <div class="composer-wrap">
+      <div class="composer-inner">
+        <div id="composerDisabledNote"></div>
+        <div class="followup-row" id="followupRow"></div>
+        <div class="composer">
+          <textarea id="composerInput" rows="1" placeholder="Upload a PDF to start chatting..." maxlength="1000" disabled></textarea>
+          <button class="send-btn" id="sendBtn" aria-label="Send message" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/></svg>
+          </button>
+        </div>
+        <div class="composer-meta">
+          <span class="composer-hint">Enter to send · Shift+Enter for new line</span>
+          <span class="char-count" id="charCount">0/1000</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<input type="file" id="fileInput" accept=".pdf" style="display:none">
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  var WORKSPACE = "pdf_chat";
+  var MAX_SIZE_MB = 5;
+
+  var state = {
+    conversationId: null,
+    messages: [],
+    conversations: [],
+    devMode: false,
+    isSending: false,
+    searchTerm: "",
+    suggestedQuestions: [],
+    sessionId: null,
+    sessionFilename: null,
+    sessionChunkCount: null,
+    uploadStage: "idle"
+  };
+
+  var sidebar = document.getElementById("sidebar");
+  var conversationList = document.getElementById("conversationList");
+  var messagesInner = document.getElementById("messagesInner");
+  var messagesScroll = document.getElementById("messagesScroll");
+  var composerInput = document.getElementById("composerInput");
+  var sendBtn = document.getElementById("sendBtn");
+  var charCount = document.getElementById("charCount");
+  var chatTitle = document.getElementById("chatTitle");
+  var followupRow = document.getElementById("followupRow");
+  var headerActions = document.getElementById("headerActions");
+  var composerDisabledNote = document.getElementById("composerDisabledNote");
+  var devModeToggle = document.getElementById("devModeToggle");
+  var searchBox = document.getElementById("searchBox");
+  var searchInput = document.getElementById("searchInput");
+  var fileInput = document.getElementById("fileInput");
+
+  state.devMode = localStorage.getItem("pia-devmode") === "true";
+  devModeToggle.checked = state.devMode;
+
+  function scrollToBottom() { messagesScroll.scrollTop = messagesScroll.scrollHeight; }
+
+  function confidenceClass(score) {
+    if (score >= 0.85) return "confidence-high";
+    if (score >= 0.75) return "confidence-mid";
+    return "confidence-low";
+  }
+
+  const dropdown = document.getElementById("llmDropdown");
+
+  const button = document.getElementById("llmButton");
+
+  const menu = document.getElementById("llmMenu");
+
+  const selected = document.getElementById("selectedModel");
+
+  let currentProvider = "nvidia";
+
+button.onclick = () => {
+
+    dropdown.classList.toggle("open");
+
+};
+
+document.querySelectorAll(".llm-item").forEach(item=>{
+
+    item.onclick=()=>{
+
+        document
+            .querySelectorAll(".llm-item")
+            .forEach(i=>i.classList.remove("active"));
+
+        item.classList.add("active");
+
+        selected.textContent=item.textContent.trim();
+
+        currentProvider=item.dataset.provider;
+
+        dropdown.classList.remove("open");
+
+    };
+
+});
+
+document.addEventListener("click",(e)=>{
+
+    if(!dropdown.contains(e.target))
+
+        dropdown.classList.remove("open");
+
+});
+
+  function renderHeader() {
+    var html = "";
+    if (state.sessionId) {
+      html +=
+        '<div class="doc-pill">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>' +
+          '<span>' + PolicyUI.escapeHtml(state.sessionFilename || "Document") + '</span>' +
+        '</div>' +
+        '<button class="icon-btn icon-btn-sm" id="docMenuBtn" aria-label="Document options">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>' +
+        '</button>';
+    }
+    if (state.conversationId) {
+      html += '<button class="icon-btn icon-btn-sm" id="exportTxtBtn" aria-label="Export as TXT"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></button>';
+    }
+    headerActions.innerHTML = html;
+
+    var docMenuBtn = document.getElementById("docMenuBtn");
+    if (docMenuBtn) docMenuBtn.addEventListener("click", function (e) { e.stopPropagation(); openDocMenu(docMenuBtn); });
+
+    var exportBtn = document.getElementById("exportTxtBtn");
+    if (exportBtn) exportBtn.addEventListener("click", function () {
+      PolicyAPI.exportConversation(state.conversationId, "txt").catch(function (err) { PolicyUI.toast(err.message || "Export failed", "error"); });
+    });
+  }
+
+  function openDocMenu(btn) {
+    closeAllDropdowns();
+    btn.classList.add("open");
+    var rect = btn.getBoundingClientRect();
+    var menu = document.createElement("div");
+    menu.className = "dropdown-menu";
+    menu.style.top = (rect.bottom + 6) + "px";
+    menu.style.left = Math.max(8, rect.right - 190) + "px";
+    menu.innerHTML =
+      '<button data-action="upload-new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>Upload New Document</button>' +
+      '<div class="divider"></div>' +
+      '<button data-action="clear-session" class="danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14Z"/></svg>Clear Session</button>';
+    document.body.appendChild(menu);
+    requestAnimationFrame(function () { menu.classList.add("open"); });
+
+    menu.querySelector('[data-action="upload-new"]').addEventListener("click", function () { closeAllDropdowns(); fileInput.click(); });
+    menu.querySelector('[data-action="clear-session"]').addEventListener("click", function () { closeAllDropdowns(); clearSession(); });
+  }
+
+  function closeAllDropdowns() {
+    document.querySelectorAll(".dropdown-menu").forEach(function (el) { el.remove(); });
+    document.querySelectorAll(".conv-item-menu-btn.open, #docMenuBtn.open").forEach(function (el) { el.classList.remove("open"); });
+  }
+
+  function clearSession() {
+    PolicyUI.confirmDialog({
+      title: "Clear this document session?",
+      message: "You'll need to upload a PDF again to continue chatting. Your saved conversations are not affected.",
+      confirmLabel: "Clear Session",
+      danger: true
+    }).then(function (confirmed) {
+      if (!confirmed) return;
+      var sid = state.sessionId;
+      state.sessionId = null;
+      state.sessionFilename = null;
+      state.sessionChunkCount = null;
+      state.uploadStage = "idle";
+      if (sid) PolicyAPI.clearPdfSession(sid).catch(function () {});
+      renderMain();
+      renderHeader();
+      updateComposerAvailability();
+      PolicyUI.toast("Document session cleared", "success", 2000);
+    });
+  }
+
+  function renderUploadZone(errorMessage) {
+    var errorHtml = errorMessage
+      ? '<div class="upload-error-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>' + PolicyUI.escapeHtml(errorMessage) + '</div>'
+      : "";
+
+    messagesInner.innerHTML =
+      '<div class="upload-wrap">' +
+        '<div class="upload-zone glass" id="uploadZone">' +
+          '<div class="upload-zone-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg></div>' +
+          '<h2>Upload a PDF to get started</h2>' +
+          '<p>Drag and drop your file here, or click to browse</p>' +
+          '<button class="btn btn-secondary" type="button">Browse Files</button>' +
+          '<div class="constraints">PDF only &middot; Max ' + MAX_SIZE_MB + 'MB</div>' +
+          errorHtml +
+        '</div>' +
+      '</div>';
+
+    var zone = document.getElementById("uploadZone");
+    zone.addEventListener("click", function () { fileInput.click(); });
+    zone.addEventListener("dragover", function (e) { e.preventDefault(); zone.classList.add("dragging"); });
+    zone.addEventListener("dragleave", function () { zone.classList.remove("dragging"); });
+    zone.addEventListener("drop", function (e) {
+      e.preventDefault();
+      zone.classList.remove("dragging");
+      if (e.dataTransfer.files.length) handleFileSelected(e.dataTransfer.files[0]);
+    });
+  }
+
+  fileInput.addEventListener("change", function () {
+    if (fileInput.files.length) handleFileSelected(fileInput.files[0]);
+    fileInput.value = "";
+  });
+
+  function handleFileSelected(file) {
+    if (!file.name.toLowerCase().endsWith(".pdf")) { renderUploadZone("Only PDF files are allowed."); return; }
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) { renderUploadZone("File too large. Maximum allowed size is " + MAX_SIZE_MB + "MB."); return; }
+    if (file.size === 0) { renderUploadZone("The selected file is empty."); return; }
+    startUpload(file);
+  }
+
+  var STEPS = [
+    { label: "Reading PDF" },
+    { label: "Cleaning &amp; chunking text" },
+    { label: "Generating embeddings" },
+    { label: "Building search index" }
+  ];
+
+  function renderStepper(activeIndex, failedIndex) {
+    var html = '<div class="processing-wrap"><h2>Processing your document...</h2><div class="stepper">';
+    STEPS.forEach(function (step, i) {
+      var cls = "";
+      var iconInner = '<circle cx="12" cy="12" r="9"/>';
+      if (failedIndex === i) { cls = "failed"; iconInner = '<circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>'; }
+      else if (i < activeIndex) { cls = "done"; iconInner = '<path d="m20 6-11 11-5-5"/>'; }
+      else if (i === activeIndex) { cls = "active"; iconInner = '<path d="M21 12a9 9 0 1 1-6.2-8.6"/>'; }
+      html +=
+        '<div class="step-item ' + cls + '">' +
+          '<div class="step-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + iconInner + '</svg></div>' +
+          '<div class="step-label">' + step.label + '</div>' +
+        '</div>';
+    });
+    html += '</div></div>';
+    messagesInner.innerHTML = html;
+  }
+
+  function startUpload(file) {
+    state.uploadStage = "uploading";
+    var stepIndex = 0;
+    renderStepper(0);
+
+    var autoAdvance = setInterval(function () {
+      stepIndex++;
+      if (stepIndex >= STEPS.length - 1) { clearInterval(autoAdvance); stepIndex = STEPS.length - 1; }
+      renderStepper(stepIndex);
+    }, 750);
+
+    PolicyAPI.uploadPdf(file).then(function (res) {
+      clearInterval(autoAdvance);
+      renderStepper(STEPS.length);
+      setTimeout(function () {
+        state.sessionId = res.session_id;
+        state.sessionFilename = res.filename;
+        state.sessionChunkCount = res.chunk_count;
+        state.uploadStage = "ready";
+        state.conversationId = null;
+        state.messages = [];
+        renderHeader();
+        updateComposerAvailability();
+        renderMain();
+        PolicyUI.toast("Document ready - " + res.chunk_count + " chunks indexed", "success", 3000);
+      }, 500);
+    }).catch(function (err) {
+      clearInterval(autoAdvance);
+      renderStepper(stepIndex, stepIndex);
+      setTimeout(function () {
+        state.uploadStage = "idle";
+        renderUploadZone(err.message || "Failed to process the uploaded PDF.");
+      }, 900);
+    });
+  }
+
+  function renderDocReadyEmptyState() {
+    var chipsHtml = state.suggestedQuestions.map(function (q) {
+      return '<button class="chip-btn" data-suggested="' + PolicyUI.escapeHtml(q) + '">' + PolicyUI.escapeHtml(q) + '</button>';
+    }).join("");
+
+    messagesInner.innerHTML =
+      '<div class="doc-ready-card glass">' +
+        '<div class="doc-ready-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m20 6-11 11-5-5"/></svg></div>' +
+        '<div class="doc-ready-info">' +
+          '<div class="doc-ready-name">' + PolicyUI.escapeHtml(state.sessionFilename) + '</div>' +
+          '<div class="doc-ready-meta">' + state.sessionChunkCount + ' chunks indexed &middot; Ready to chat</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="empty-state">' +
+        '<h2>Ask anything about this document</h2>' +
+        '<p>Answers are grounded in the uploaded PDF only, with page-level evidence.</p>' +
+        '<div class="suggested-chips">' + chipsHtml + '</div>' +
+      '</div>';
+
+    messagesInner.querySelectorAll("[data-suggested]").forEach(function (btn) {
+      btn.addEventListener("click", function () { sendMessage(btn.dataset.suggested); });
+    });
+  }
+
+  function buildEvidenceHtml(evidence, messageId) {
+    if (!evidence || evidence.length === 0) return "";
+    var cards = evidence.map(function (ev) {
+      var citation = "Source: " + ev.source + ", Page: " + ev.page + ", Section: " + ev.section;
+      return (
+        '<div class="evidence-card">' +
+          '<div class="evidence-card-top">' +
+            '<span class="confidence-badge ' + confidenceClass(ev.similarity_score) + '">' + ev.similarity_score.toFixed(2) + '</span>' +
+            '<button class="icon-btn icon-btn-sm" data-citation="' + PolicyUI.escapeHtml(citation) + '" aria-label="Copy citation">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>' +
+            '</button>' +
+          '</div>' +
+          '<div class="evidence-card-source">' + PolicyUI.escapeHtml(ev.source) + '</div>' +
+          '<div class="evidence-card-meta">Page ' + ev.page + ' &middot; ' + PolicyUI.escapeHtml(ev.section) + '</div>' +
+        '</div>'
+      );
+    }).join("");
+
+    return (
+      '<button class="evidence-toggle" data-toggle-evidence="' + messageId + '">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg>' +
+        'Show ' + evidence.length + ' source' + (evidence.length > 1 ? 's' : '') +
+        '<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>' +
+      '</button>' +
+      '<div class="evidence-panel" id="evidence-' + messageId + '">' + cards + '</div>'
+    );
+  }
+
+  function buildDevModeHtml(msg) {
+    if (!state.devMode) return "";
+    var rows = [
+      ["Provider", msg.provider || "-"], ["Model", msg.model || "-"],
+      ["Grounded", msg.grounded ? "true" : "false"],
+      ["Retriever Time", (msg.retriever_time_seconds != null ? msg.retriever_time_seconds + "s" : "-")],
+      ["Response Time", (msg.response_time_seconds != null ? msg.response_time_seconds + "s" : "-")],
+      ["Evidence Count", (msg.evidence ? msg.evidence.length : 0)]
+    ];
+    var gridHtml = rows.map(function (r) { return '<span class="devmode-key">' + r[0] + '</span><span class="devmode-val">' + r[1] + '</span>'; }).join("");
+    return '<div class="devmode-panel"><div class="devmode-grid">' + gridHtml + '</div></div>';
+  }
+
+  function buildAssistantBubbleClass(msg) {
+    if (!msg.grounded) return "msg-bubble no-evidence";
+    var top = msg.evidence && msg.evidence.length ? msg.evidence[0].similarity_score : 0;
+    return "msg-bubble confidence-thread " + confidenceClass(top);
+  }
+
+  function renderMessagesList() {
+    var html = "";
+    var lastAssistantIdx = -1;
+    state.messages.forEach(function (m, i) { if (m.role === "assistant") lastAssistantIdx = i; });
+
+    state.messages.forEach(function (msg, idx) {
+      var isLastAssistant = (idx === lastAssistantIdx);
+
+      if (msg.role === "user") {
+        html +=
+          '<div class="message user">' +
+            '<div class="msg-avatar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>' +
+            '<div class="msg-bubble-wrap"><div class="msg-bubble">' + PolicyUI.escapeHtml(msg.content) + '</div></div>' +
+          '</div>';
+        return;
+      }
+
+      if (msg.pending) {
+        html +=
+          '<div class="message assistant">' +
+            '<div class="msg-avatar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></div>' +
+            '<div class="msg-bubble-wrap"><div class="msg-bubble thinking-bubble"><div class="thinking-dots"><span></span><span></span><span></span></div><span class="thinking-label">Thinking...</span></div></div>' +
+          '</div>';
+        return;
+      }
+
+      if (msg.failed) {
+        html +=
+          '<div class="message assistant">' +
+            '<div class="msg-avatar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></div>' +
+            '<div class="msg-bubble-wrap"><div class="msg-bubble">' +
+              '<div class="msg-error-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>' + PolicyUI.escapeHtml(msg.error || "Something went wrong.") + '</div>' +
+              '<button class="retry-btn" data-retry="' + msg.retryText.replace(/"/g, "&quot;") + '">Retry</button>' +
+            '</div></div>' +
+          '</div>';
+        return;
+      }
+
+      var evidenceHtml = buildEvidenceHtml(msg.evidence, msg.id);
+      var devHtml = buildDevModeHtml(msg);
+      var noEvidenceTag = (!msg.grounded) ? '<div class="no-evidence-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>No matching evidence found in this document</div>' : "";
+
+      var followupHtml = "";
+      if (isLastAssistant && msg.followup_questions && msg.followup_questions.length) {
+        followupHtml = msg.followup_questions.map(function (q) {
+          return '<button class="followup-chip" data-followup="' + PolicyUI.escapeHtml(q) + '">' + PolicyUI.escapeHtml(q) + '</button>';
+        }).join("");
+      }
+      followupRow.innerHTML = followupHtml;
+
+      var actionsHtml =
+        '<div class="msg-actions">' +
+          '<button class="msg-action-btn" data-copy="' + msg.id + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button>' +
+          (isLastAssistant ? '<button class="msg-action-btn" data-regenerate="' + msg.id + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>Regenerate</button>' : '') +
+          '<button class="msg-action-btn ' + (msg.feedback === true ? "liked" : "") + '" data-like="' + msg.id + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg></button>' +
+          '<button class="msg-action-btn ' + (msg.feedback === false ? "disliked" : "") + '" data-dislike="' + msg.id + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg></button>' +
+        '</div>';
+
+      html +=
+        '<div class="message assistant">' +
+          '<div class="msg-avatar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></div>' +
+          '<div class="msg-bubble-wrap">' +
+            '<div class="' + buildAssistantBubbleClass(msg) + '">' +
+              '<div class="md-content">' + PolicyUI.renderMarkdown(msg.content) + '</div>' +
+              noEvidenceTag + evidenceHtml + devHtml +
+            '</div>' +
+            actionsHtml +
+          '</div>' +
+        '</div>';
+    });
+
+    messagesInner.innerHTML = html;
+    wireMessageEvents();
+    scrollToBottom();
+  }
+
+  function renderMain() {
+    if (state.uploadStage === "uploading") return;
+    if (!state.sessionId) { renderUploadZone(); return; }
+    if (state.messages.length === 0) { renderDocReadyEmptyState(); followupRow.innerHTML = ""; return; }
+    renderMessagesList();
+  }
+
+  function updateComposerAvailability() {
+    var hasSession = !!state.sessionId;
+    composerInput.disabled = !hasSession || state.isSending;
+    sendBtn.disabled = !hasSession || state.isSending;
+    composerInput.placeholder = hasSession ? "Ask about this document..." : "Upload a PDF to start chatting...";
+    composerDisabledNote.innerHTML = hasSession ? "" :
+      '<div class="composer-disabled-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>Upload a PDF above to begin asking questions</div>';
+  }
+
+  function wireMessageEvents() {
+    messagesInner.querySelectorAll("[data-toggle-evidence]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var panel = document.getElementById("evidence-" + btn.dataset.toggleEvidence);
+        btn.classList.toggle("open"); panel.classList.toggle("open");
+      });
+    });
+    messagesInner.querySelectorAll("[data-citation]").forEach(function (btn) {
+      btn.addEventListener("click", function () { PolicyUI.copyToClipboard(btn.dataset.citation, "Citation copied"); });
+    });
+    messagesInner.querySelectorAll("[data-copy]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var msg = state.messages.find(function (m) { return m.id === btn.dataset.copy; });
+        if (msg) PolicyUI.copyToClipboard(msg.content, "Answer copied");
+      });
+    });
+    messagesInner.querySelectorAll("[data-regenerate]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var lastUser = null;
+        for (var i = state.messages.length - 1; i >= 0; i--) {
+          if (state.messages[i].role === "user") { lastUser = state.messages[i].content; break; }
+        }
+        if (lastUser) sendMessage(lastUser);
+      });
+    });
+    messagesInner.querySelectorAll("[data-like]").forEach(function (btn) { btn.addEventListener("click", function () { handleFeedback(btn.dataset.like, true); }); });
+    messagesInner.querySelectorAll("[data-dislike]").forEach(function (btn) { btn.addEventListener("click", function () { handleFeedback(btn.dataset.dislike, false); }); });
+    messagesInner.querySelectorAll("[data-retry]").forEach(function (btn) {
+      btn.addEventListener("click", function () { state.messages.pop(); sendMessage(btn.dataset.retry, true); });
+    });
+    followupRow.querySelectorAll("[data-followup]").forEach(function (btn) { btn.addEventListener("click", function () { sendMessage(btn.dataset.followup); }); });
+  }
+
+  function handleFeedback(messageId, isHelpful) {
+    var msg = state.messages.find(function (m) { return m.id === messageId; });
+    if (!msg) return;
+    msg.feedback = isHelpful;
+    renderMessagesList();
+    PolicyAPI.submitFeedback(messageId, isHelpful).then(function () {
+      PolicyUI.toast(isHelpful ? "Marked as helpful" : "Marked as not helpful", "success", 2000);
+    }).catch(function (err) { PolicyUI.toast(err.message || "Could not save feedback", "error"); });
+  }
+
+  function sendMessage(text, skipUserAppend) {
+    text = (text || "").trim();
+    if (!text || state.isSending || !state.sessionId) return;
+
+    if (!skipUserAppend) state.messages.push({ id: "u-" + Date.now(), role: "user", content: text });
+    var pendingId = "p-" + Date.now();
+    state.messages.push({ id: pendingId, role: "assistant", pending: true });
+    renderMessagesList();
+
+    state.isSending = true;
+    composerInput.value = "";
+    updateComposerAvailability();
+    charCount.textContent = "0/1000";
+    autoResize();
+
+    PolicyAPI.askPdf(text, state.sessionId, state.conversationId,currentProvider).then(function (res) {
+      state.conversationId = res.conversation_id;
+      var idx = state.messages.findIndex(function (m) { return m.id === pendingId; });
+      state.messages[idx] = {
+        id: "a-" + Date.now(), role: "assistant", content: res.answer, grounded: res.grounded,
+        provider: res.provider, model: res.model, evidence: res.evidence || [],
+        followup_questions: res.followup_questions || [], retriever_time_seconds: res.retriever_time_seconds,
+        response_time_seconds: res.response_time_seconds, feedback: null
+      };
+      renderMessagesList();
+      renderHeader();
+      loadConversations();
+    }).catch(function (err) {
+      var idx = state.messages.findIndex(function (m) { return m.id === pendingId; });
+      state.messages[idx] = { id: pendingId, role: "assistant", failed: true, error: err.message, retryText: text };
+      renderMessagesList();
+      PolicyUI.toast(err.message || "Failed to get a response", "error");
+    }).finally(function () {
+      state.isSending = false;
+      updateComposerAvailability();
+      composerInput.focus();
+    });
+  }
+
+  function startNewChat() {
+    state.conversationId = null;
+    state.messages = [];
+    chatTitle.textContent = "New Chat";
+    renderMain();
+    renderHeader();
+    setActiveConversationInList(null);
+    closeMobileSidebar();
+  }
+
+  function setActiveConversationInList(id) {
+    conversationList.querySelectorAll(".conv-item").forEach(function (el) { el.classList.toggle("active", el.dataset.id === id); });
+  }
+
+  function openConversation(id) {
+    PolicyAPI.getConversation(id).then(function (conv) {
+      state.conversationId = conv.id;
+      state.messages = conv.messages.map(function (m) {
+        return { id: m.id, role: m.role, content: m.content, grounded: m.grounded, provider: m.provider, model: m.model, evidence: m.evidence || [], followup_questions: [], retriever_time_seconds: m.response_time_seconds, response_time_seconds: m.response_time_seconds, feedback: null };
+      });
+      chatTitle.textContent = conv.title;
+      if (!state.sessionId) {
+        composerDisabledNote.innerHTML = '<div class="composer-disabled-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>This document session has ended - upload a PDF to continue chatting</div>';
+      }
+      renderMessagesList();
+      renderHeader();
+      setActiveConversationInList(id);
+      closeMobileSidebar();
+    }).catch(function (err) { PolicyUI.toast(err.message || "Could not load conversation", "error"); });
+  }
+
+  function loadConversations() {
+    var task = state.searchTerm ? PolicyAPI.searchConversations(state.searchTerm) : PolicyAPI.listConversations(WORKSPACE);
+    task.then(function (list) {
+      if (state.searchTerm) list = list.filter(function (c) { return c.workspace === WORKSPACE; });
+      state.conversations = list;
+      renderConversationList();
+    }).catch(function (err) { PolicyUI.toast(err.message || "Could not load chat history", "error"); });
+  }
+
+  function highlightMatch(title) {
+    if (!state.searchTerm) return PolicyUI.escapeHtml(title);
+    var escaped = PolicyUI.escapeHtml(title);
+    var term = PolicyUI.escapeHtml(state.searchTerm);
+    var re = new RegExp("(" + term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "ig");
+    return escaped.replace(re, "<mark>$1</mark>");
+  }
+
+  function renderConversationList() {
+    if (state.conversations.length === 0) {
+      conversationList.innerHTML = '<div class="empty-list-note">No conversations found</div>';
+      return;
+    }
+    var groups = PolicyUI.groupByRecency(state.conversations);
+    var html = "";
+    Object.keys(groups).forEach(function (label) {
+      var items = groups[label];
+      if (items.length === 0) return;
+      html += '<div class="group-label">' + label + '</div>';
+      items.forEach(function (c) {
+        var active = c.id === state.conversationId ? "active" : "";
+        html +=
+          '<div class="conv-item ' + active + '" data-id="' + c.id + '">' +
+            '<div class="conv-item-main"><div class="conv-item-title">' + highlightMatch(c.title) + '</div></div>' +
+            '<button class="icon-btn icon-btn-sm conv-item-menu-btn" data-menu="' + c.id + '" aria-label="Conversation options">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>' +
+            '</button>' +
+          '</div>';
+      });
+    });
+    conversationList.innerHTML = html;
+    wireConversationListEvents();
+  }
+
+  function wireConversationListEvents() {
+    conversationList.querySelectorAll(".conv-item").forEach(function (item) {
+      item.addEventListener("click", function (e) { if (e.target.closest("[data-menu]")) return; openConversation(item.dataset.id); });
+    });
+    conversationList.querySelectorAll("[data-menu]").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var alreadyOpen = btn.classList.contains("open");
+        closeAllDropdowns();
+        if (alreadyOpen) return;
+        openConvMenu(btn, btn.dataset.menu);
+      });
+    });
+  }
+
+  function openConvMenu(btn, convId) {
+    btn.classList.add("open");
+    var rect = btn.getBoundingClientRect();
+    var menu = document.createElement("div");
+    menu.className = "dropdown-menu";
+    menu.style.top = (rect.bottom + 6) + "px";
+    menu.style.left = Math.max(8, rect.right - 180) + "px";
+    menu.innerHTML =
+      '<button data-action="rename"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>Rename</button>' +
+      '<button data-action="export-txt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Export as TXT</button>' +
+      '<button data-action="export-md"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Export as Markdown</button>' +
+      '<button data-action="export-pdf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Export as PDF</button>' +
+      '<div class="divider"></div>' +
+      '<button data-action="delete" class="danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14Z"/></svg>Delete</button>';
+    document.body.appendChild(menu);
+    requestAnimationFrame(function () { menu.classList.add("open"); });
+
+    menu.querySelector('[data-action="rename"]').addEventListener("click", function () { closeAllDropdowns(); startRename(convId); });
+    menu.querySelector('[data-action="export-txt"]').addEventListener("click", function () { closeAllDropdowns(); PolicyAPI.exportConversation(convId, "txt").catch(function (err) { PolicyUI.toast(err.message, "error"); }); });
+    menu.querySelector('[data-action="export-md"]').addEventListener("click", function () { closeAllDropdowns(); PolicyAPI.exportConversation(convId, "md").catch(function (err) { PolicyUI.toast(err.message, "error"); }); });
+    menu.querySelector('[data-action="export-pdf"]').addEventListener("click", function () { closeAllDropdowns(); PolicyAPI.exportConversation(convId, "pdf").catch(function (err) { PolicyUI.toast(err.message, "error"); }); });
+    menu.querySelector('[data-action="delete"]').addEventListener("click", function () { closeAllDropdowns(); deleteConversation(convId); });
+  }
+
+  function startRename(convId) {
+    var item = conversationList.querySelector('.conv-item[data-id="' + convId + '"] .conv-item-title');
+    if (!item) return;
+    var current = item.textContent;
+    var input = document.createElement("input");
+    input.type = "text"; input.className = "conv-rename-input"; input.value = current;
+    item.replaceWith(input); input.focus(); input.select();
+
+    function commit() {
+      var newTitle = input.value.trim();
+      if (!newTitle || newTitle === current) { loadConversations(); return; }
+      fetch("http://127.0.0.1:8000/chat/conversations/" + convId + "/title", {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: newTitle })
+      }).then(function (r) {
+        if (!r.ok) throw new Error("Rename failed");
+        if (convId === state.conversationId) chatTitle.textContent = newTitle;
+        PolicyUI.toast("Conversation renamed", "success", 2000);
+        loadConversations();
+      }).catch(function () { PolicyUI.toast("Could not rename conversation", "error"); loadConversations(); });
+    }
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") input.blur();
+      if (e.key === "Escape") { input.value = current; input.blur(); }
+    });
+  }
+
+  function deleteConversation(convId) {
+    PolicyUI.confirmDialog({ title: "Delete conversation?", message: "This will permanently delete this conversation and all its messages. This cannot be undone.", confirmLabel: "Delete", danger: true })
+      .then(function (confirmed) {
+        if (!confirmed) return;
+        PolicyAPI.deleteConversation(convId).then(function () {
+          PolicyUI.toast("Conversation deleted", "success", 2000);
+          if (convId === state.conversationId) startNewChat();
+          loadConversations();
+        }).catch(function (err) { PolicyUI.toast(err.message || "Could not delete conversation", "error"); });
+      });
+  }
+
+  function autoResize() {
+    composerInput.style.height = "auto";
+    composerInput.style.height = Math.min(composerInput.scrollHeight, 200) + "px";
+  }
+
+  function openMobileSidebar() { sidebar.classList.add("mobile-open"); document.getElementById("sidebarOverlay").classList.add("open"); }
+  function closeMobileSidebar() { sidebar.classList.remove("mobile-open"); document.getElementById("sidebarOverlay").classList.remove("open"); }
+
+  document.getElementById("newChatBtn").addEventListener("click", startNewChat);
+  document.getElementById("mobileMenuBtn").addEventListener("click", openMobileSidebar);
+  document.getElementById("sidebarOverlay").addEventListener("click", closeMobileSidebar);
+
+  document.getElementById("collapseToggle").addEventListener("click", function () {
+    sidebar.classList.toggle("collapsed");
+    localStorage.setItem("pia-sidebar-collapsed", sidebar.classList.contains("collapsed"));
+  });
+  if (localStorage.getItem("pia-sidebar-collapsed") === "true") sidebar.classList.add("collapsed");
+
+  document.getElementById("themeToggle").addEventListener("click", function () {
+    var root = document.documentElement;
+    var current = root.getAttribute("data-theme") === "light" ? "light" : "dark";
+    var next = current === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    localStorage.setItem("pia-theme", next);
+  });
+
+  devModeToggle.addEventListener("change", function () {
+    state.devMode = devModeToggle.checked;
+    localStorage.setItem("pia-devmode", state.devMode);
+    if (state.messages.length) renderMessagesList();
+  });
+
+  document.getElementById("switchPolicy").addEventListener("click", function () { window.location.href = "/policy"; });
+  document.getElementById("switchPdf").addEventListener("click", function () { window.location.href = "/pdf"; });
+
+  var debouncedSearch = PolicyUI.debounce(function (val) { state.searchTerm = val.trim(); loadConversations(); }, 300);
+  searchInput.addEventListener("input", function () {
+    searchBox.classList.toggle("has-value", searchInput.value.length > 0);
+    debouncedSearch(searchInput.value);
+  });
+  document.getElementById("clearSearch").addEventListener("click", function () {
+    searchInput.value = ""; searchBox.classList.remove("has-value"); state.searchTerm = ""; loadConversations();
+  });
+
+  composerInput.addEventListener("input", function () { charCount.textContent = composerInput.value.length + "/1000"; autoResize(); });
+  composerInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(composerInput.value); }
+  });
+  sendBtn.addEventListener("click", function () { sendMessage(composerInput.value); });
+
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest(".dropdown-menu") && !e.target.closest("[data-menu]") && !e.target.closest("#docMenuBtn")) closeAllDropdowns();
+  });
+
+  PolicyAPI.getPdfSuggestedQuestions().then(function (res) { state.suggestedQuestions = res.questions || []; if (state.sessionId && state.messages.length === 0) renderMain(); }).catch(function () {});
+
+  loadConversations();
+  renderMain();
+  renderHeader();
+  updateComposerAvailability();
+
+});
+</script>
+
+</body>
+</html>

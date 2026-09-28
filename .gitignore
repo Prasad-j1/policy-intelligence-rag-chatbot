@@ -1,0 +1,102 @@
+# ================================
+# Environment & Secrets
+# ================================
+.env
+.env.*
+!.env.example
+
+# ================================
+# Python
+# ================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+.venv/
+
+# ================================
+# Python Packaging
+# ================================
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ================================
+# IDE / Editor
+# ================================
+.vscode/
+.idea/
+*.code-workspace
+
+# ================================
+# Jupyter Notebook
+# ================================
+.ipynb_checkpoints/
+
+# ================================
+# OS Generated Files
+# ================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ================================
+# Logs
+# ================================
+*.log
+logs/
+
+# ================================
+# Local Databases
+# ================================
+*.db
+*.sqlite
+*.sqlite3
+
+# ================================
+# RAG / Vector Store Generated Files
+# ================================
+faiss_index/
+vector_store/
+chroma_db/
+*.faiss
+*.pkl
+
+# ================================
+# Uploaded / Generated Documents
+# ================================
+uploads/
+uploaded_files/
+generated_files/
+
+# PDF processing temporary files
+*.tmp
+*.temp
+
+# ================================
+# ML / Model Cache
+# ================================
+models/
+model_cache/
+.cache/
+huggingface_cache/
+
+# ================================
+# Temporary Files
+# ================================
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# ================================
+# Coverage / Testing
+# ================================
+.pytest_cache/
+.coverage
+htmlcov/

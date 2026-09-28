@@ -1,0 +1,14 @@
+{
+  "policy": [
+    "What is the maternity leave policy?",
+    "How many casual leave days do I get per year?",
+    "What is the work from home policy?",
+    "What are the IT and data security guidelines?"
+  ],
+  "pdf_chat": [
+    "What is this document about?",
+    "Summarize the key points of this document.",
+    "What are the main topics covered?",
+    "Are there any important dates or deadlines mentioned?"
+  ]
+}

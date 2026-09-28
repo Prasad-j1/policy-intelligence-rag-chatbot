@@ -1,0 +1,19 @@
+Given the user's last question and the assistant's answer, generate exactly 3 natural follow-up questions.
+
+Rules:
+
+- Return ONLY questions.
+- One question per line.
+- Do NOT include "User:".
+- Do NOT include "Assistant:".
+- Do NOT answer the questions.
+- Do NOT explain anything.
+- Do NOT number the questions.
+- Do NOT use bullets.
+- Stop immediately after the third question.
+- Every line must end with a question mark.
+
+Input:
+{input}
+
+Output:

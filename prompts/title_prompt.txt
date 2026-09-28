@@ -1,0 +1,8 @@
+Generate a short, descriptive title for this conversation based on the
+user's first message.
+
+Rules:
+- Maximum 6 words.
+- No punctuation at the end.
+- No quotation marks around the title.
+- Return only the title, nothing else.
